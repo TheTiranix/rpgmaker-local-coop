@@ -5,11 +5,13 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$GamePath,
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    # auto = detecta por el titulo del juego. lookoutside = solo el plugin base. fearhunger = base + acciones de P2 (disparo previo al combate).
+    [ValidateSet('auto', 'lookoutside', 'fearhunger', 'generic')][string]$Profile = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
-$names = @('LookOutsideOnline', 'LookOutsideOnline_Actions')
+$allNames = @('LookOutsideOnline', 'LocalCoop_FearHunger_Actions', 'LookOutsideOnline_Actions')
 
 $candidates = @("$GamePath\js", "$GamePath\www\js")
 $jsDir = $candidates | Where-Object { Test-Path "$_\plugins.js" } | Select-Object -First 1
@@ -18,11 +20,25 @@ if (-not $jsDir) { throw "No encuentro js\plugins.js en '$GamePath'. Apunta a la
 $pluginDir = Join-Path $jsDir 'plugins'
 $pluginsJs = Join-Path $jsDir 'plugins.js'
 $src = Join-Path $PSScriptRoot 'plugins'
+
+# Perfil: el plugin de disparo previo al combate solo va en juegos que lo tienen (Fear & Hunger 2)
+if ($Profile -eq 'auto') {
+    $title = ''
+    foreach ($d in @("$GamePath\data", "$GamePath\www\data")) {
+        if (Test-Path "$d\System.json") { $title = [regex]::Match([IO.File]::ReadAllText("$d\System.json"), '"gameTitle"\s*:\s*"([^"]*)"').Groups[1].Value; break }
+    }
+    if ($title -match 'look\s*outside') { $Profile = 'lookoutside' }
+    elseif ($title -match 'fear|hunger|termina') { $Profile = 'fearhunger' }
+    else { $Profile = 'generic' }
+    Write-Host "Juego detectado: '$title' -> perfil $Profile"
+}
+$names = @('LookOutsideOnline')
+if ($Profile -eq 'fearhunger') { $names += 'LocalCoop_FearHunger_Actions' }
 $text = [IO.File]::ReadAllText($pluginsJs)
 
 if ($Uninstall) {
     Copy-Item $pluginsJs "$pluginsJs.coop-uninstall.bak" -Force
-    foreach ($n in $names) {
+    foreach ($n in $allNames) {
         $text = [regex]::Replace($text, ',?\s*\{\s*"name"\s*:\s*"' + $n + '".*?\}\s*(?=[,\]])', '', 'Singleline')
         Remove-Item (Join-Path $pluginDir "$n.js") -ErrorAction SilentlyContinue
     }

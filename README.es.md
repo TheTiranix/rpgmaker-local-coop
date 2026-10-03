@@ -36,15 +36,17 @@ Dos jugadores, un teclado, cualquier juego de **RPG Maker MZ / MV**. Hecho y pro
 2. Arrastra la **carpeta del juego** (la que tiene `Game.exe` / `index.html`) encima de `install.bat`.
    O ejecuta: `powershell -ExecutionPolicy Bypass -File install.ps1 -GamePath "C:\ruta\al\juego"`
 
+El instalador detecta el juego (por `data/System.json`): **Look Outside** recibe solo el plugin base; **Fear & Hunger** recibe además `LocalCoop_FearHunger_Actions.js` (gancho de disparo previo al combate, que en Look Outside no existe). Se puede forzar con `-Profile lookoutside|fearhunger|generic`.
+
 Copia los plugins a `js/plugins`, los registra en `js/plugins.js` (hace copia de seguridad `plugins.js.coop.bak`) y funciona con las carpetas `js/` y `www/js/`. Si lo vuelves a ejecutar, actualiza los archivos. `-Uninstall` lo quita todo.
 
 **Manual:**
 
-1. Copia `plugins/LookOutsideOnline.js` (y opcionalmente `LookOutsideOnline_Actions.js`) a `js/plugins/` del juego.
+1. Copia `plugins/LookOutsideOnline.js` (y opcionalmente `LocalCoop_FearHunger_Actions.js`) a `js/plugins/` del juego.
 2. Agrégalos al final de `js/plugins.js` (o actívalos en el gestor de plugins de RPG Maker):
    ```js
    { "name": "LookOutsideOnline", "status": true, "description": "Local Co-op", "parameters": {} },
-   { "name": "LookOutsideOnline_Actions", "status": true, "description": "Local Co-op", "parameters": {} }
+   { "name": "LocalCoop_FearHunger_Actions", "status": true, "description": "Local Co-op", "parameters": {} }
    ```
    Deben quedar **después** de los plugins propios del juego.
 
@@ -63,7 +65,7 @@ Entra al juego, camina un poco y pulsa `X` para traer al Jugador 2.
 | `P2DashBonus` | 1 | Velocidad extra al correr. |
 | `JoinText` | Player 2 has joined | Texto del cartel. |
 
-## Gancho de acción del J2 (`LookOutsideOnline_Actions`)
+## Gancho de acción del J2 (`LocalCoop_FearHunger_Actions`)
 
 Cada juego implementa los disparos y el sprint a su manera, así que este plugin no adivina: le da un gancho al juego. Cuando el J2 pulsa la tecla de acción (por defecto `Ctrl derecho`) en el mapa:
 

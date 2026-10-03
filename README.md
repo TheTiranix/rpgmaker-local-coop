@@ -36,15 +36,17 @@ Two players, one keyboard, any **RPG Maker MZ / MV** game. Built and tested on *
 2. Drag your **game folder** (the one with `Game.exe` / `index.html`) onto `install.bat`.
    Or run: `powershell -ExecutionPolicy Bypass -File install.ps1 -GamePath "C:\path\to\game"`
 
+The installer detects the game (from `data/System.json`): **Look Outside** gets only the base plugin; **Fear & Hunger** also gets `LocalCoop_FearHunger_Actions.js` (pre-combat shooting hook, which does not exist in Look Outside). Force it with `-Profile lookoutside|fearhunger|generic`.
+
 It copies the plugins into `js/plugins`, registers them in `js/plugins.js` (a backup `plugins.js.coop.bak` is made) and works for both `js/` and `www/js/` layouts. Re-running it updates the files. `-Uninstall` removes everything.
 
 **Manual way:**
 
-1. Copy `plugins/LookOutsideOnline.js` (and optionally `LookOutsideOnline_Actions.js`) into the game's `js/plugins/` folder.
+1. Copy `plugins/LookOutsideOnline.js` (and optionally `LocalCoop_FearHunger_Actions.js`) into the game's `js/plugins/` folder.
 2. Add them to the end of `js/plugins.js` (or enable them in the RPG Maker plugin manager):
    ```js
    { "name": "LookOutsideOnline", "status": true, "description": "Local Co-op", "parameters": {} },
-   { "name": "LookOutsideOnline_Actions", "status": true, "description": "Local Co-op", "parameters": {} }
+   { "name": "LocalCoop_FearHunger_Actions", "status": true, "description": "Local Co-op", "parameters": {} }
    ```
    They must be listed **after** the game's own plugins.
 
@@ -63,7 +65,7 @@ Start the game, walk around, and press `X` to bring in Player 2.
 | `P2DashBonus` | 1 | Extra speed while sprinting. |
 | `JoinText` | Player 2 has joined | Banner text. |
 
-## P2 action hook (`LookOutsideOnline_Actions`)
+## P2 action hook (`LocalCoop_FearHunger_Actions`)
 
 Games implement shooting and sprint differently, so this plugin does not guess: it gives the game a hook. When Player 2 presses the action key (default `Right Ctrl`) on the map:
 

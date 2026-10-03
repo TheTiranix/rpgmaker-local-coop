@@ -1,6 +1,6 @@
 /*:
  * @target MV MZ
- * @plugindesc Acciones extra para el Jugador 2 (ataque a distancia, sprint, interaccion propia) mediante eventos comunes. Requiere LookOutsideOnline.js.
+ * @plugindesc Fear & Hunger 2: acciones de Jugador 2 antes del combate (disparar/apuntar) via eventos comunes. Solo para juegos que lo permiten; NO instalar en Look Outside. Requiere LookOutsideOnline.js.
  * @author TheTiranix
  *
  * @param ActionKey
@@ -63,7 +63,7 @@
  */
 
 (() => {
-    const params = PluginManager.parameters('LookOutsideOnline_Actions') || {};
+    const params = PluginManager.parameters('LocalCoop_FearHunger_Actions') || {};
     const KEY = String(params.ActionKey || 'ControlRight');
     const CE = Number(params.ActionCommonEvent || 0);
     const SWITCH = Number(params.ActionSwitch || 0);

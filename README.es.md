@@ -14,7 +14,7 @@ Dos jugadores, un teclado, cualquier juego de **RPG Maker MZ / MV**. Hecho y pro
 | **Luz para el Jugador 2** | La luz "Darkness" de Look Outside se aplica a los dos (unida en cámara compartida, una por pantalla en dividida). |
 | **Combate por turnos para dos** | Las posiciones 1, 3 y 5 del grupo son del J1; la 2 y la 4 del J2. En el turno de cada personaje **solo responden las teclas de su dueño** y un cartel muestra de quién es el turno. |
 | **Movimiento del J2** | Velocidad propia (copia la actual del J1 por defecto) y sprint con Shift derecho. |
-| **Gancho de acción del J2** | Segundo plugin opcional: una tecla que ejecuta un evento común con la posición/dirección/actor del J2 en variables (para disparar, apuntar, interactuar...). |
+| **Plugin de Fear & Hunger 2** | Plugin aparte: el J2 dispara armas en el mapa, luz/visión para el J2, unión automática como miembro n.º 2. |
 
 ## Controles
 
@@ -26,7 +26,6 @@ Dos jugadores, un teclado, cualquier juego de **RPG Maker MZ / MV**. Hecho y pro
 | Cancelar / menú | `X` / `Esc` | `Backspace` / `Numpad .` |
 | Unirse | - | `X` (en el mapa, antes de unirse) |
 | Cámara | `G` (cualquiera) | |
-| Acción del J2 (opcional) | - | `Ctrl derecho` (configurable) |
 
 ## Instalación
 
@@ -36,17 +35,17 @@ Dos jugadores, un teclado, cualquier juego de **RPG Maker MZ / MV**. Hecho y pro
 2. Arrastra la **carpeta del juego** (la que tiene `Game.exe` / `index.html`) encima de `install.bat`.
    O ejecuta: `powershell -ExecutionPolicy Bypass -File install.ps1 -GamePath "C:\ruta\al\juego"`
 
-El instalador detecta el juego (por `data/System.json`): **Look Outside** recibe solo el plugin base; **Fear & Hunger** recibe además `LocalCoop_FearHunger_Actions.js` (gancho de disparo previo al combate, que en Look Outside no existe). Se puede forzar con `-Profile lookoutside|fearhunger|generic`.
+El instalador detecta el juego (por `data/System.json`): **Look Outside** recibe solo el plugin base; **Fear & Hunger** recibe además `LocalCoop_FearHunger.js` (disparo de P2 antes del combate, luz de visión y unión automática; en Look Outside no existe). Se puede forzar con `-Profile lookoutside|fearhunger|generic`.
 
 Copia los plugins a `js/plugins`, los registra en `js/plugins.js` (hace copia de seguridad `plugins.js.coop.bak`) y funciona con las carpetas `js/` y `www/js/`. Si lo vuelves a ejecutar, actualiza los archivos. `-Uninstall` lo quita todo.
 
 **Manual:**
 
-1. Copia `plugins/LookOutsideOnline.js` (y opcionalmente `LocalCoop_FearHunger_Actions.js`) a `js/plugins/` del juego.
+1. Copia `plugins/LookOutsideOnline.js` (y opcionalmente `LocalCoop_FearHunger.js`) a `js/plugins/` del juego.
 2. Agrégalos al final de `js/plugins.js` (o actívalos en el gestor de plugins de RPG Maker):
    ```js
    { "name": "LookOutsideOnline", "status": true, "description": "Local Co-op", "parameters": {} },
-   { "name": "LocalCoop_FearHunger_Actions", "status": true, "description": "Local Co-op", "parameters": {} }
+   { "name": "LocalCoop_FearHunger", "status": true, "description": "Local Co-op", "parameters": {} }
    ```
    Deben quedar **después** de los plugins propios del juego.
 
@@ -65,21 +64,21 @@ Entra al juego, camina un poco y pulsa `X` para traer al Jugador 2.
 | `P2DashBonus` | 1 | Velocidad extra al correr. |
 | `JoinText` | Player 2 has joined | Texto del cartel. |
 
-## Gancho de acción del J2 (`LocalCoop_FearHunger_Actions`)
+## Fear & Hunger 2: Termina (`LocalCoop_FearHunger`)
 
-Cada juego implementa los disparos y el sprint a su manera, así que este plugin no adivina: le da un gancho al juego. Cuando el J2 pulsa la tecla de acción (por defecto `Ctrl derecho`) en el mapa:
+Termina es RPG Maker **MV** con sistemas propios, así que este plugin aparte (se instala solo para Fear & Hunger, nunca en Look Outside) adapta el mod:
 
-1. Guarda la X, Y, dirección e ID de actor del J2 en las variables que elijas.
-2. Ejecuta el **evento común** elegido.
-3. Mantiene en ON el **interruptor** elegido mientras la tecla siga pulsada (útil para "apuntar").
+- **Unirse:** pulsa `X` en el mapa. Si el grupo tiene **solo al protagonista**, un menú pregunta qué personaje sumar (Levi, Marina, Daan, Abella, Marcoh, Karin, Olivia). Si el grupo **ya tiene 2 o más miembros**, el Jugador 2 pasa automáticamente a ser el **miembro n.º 2**, sin menú.
+- **Personajes que abandonan el grupo:** el Jugador 2 siempre sigue a la posición n.º 2 del grupo. Si ese personaje se va, pasa a ser quien quede en esa posición (sale un cartel). Si el grupo queda solo con el protagonista, el Jugador 2 sale hasta volver a pulsar `X`. El mod nunca obliga a nadie a quedarse en el grupo, así que la historia no se toca.
+- **Disparar antes del combate:** en Termina, mantener Shift con un arma de fuego equipada dispara en el mapa (cada mapa tiene un evento `arrow_check`). El Jugador 2 hace lo mismo con **Shift derecho** cuando *su* personaje tiene pistola, fusil o escopeta equipada: mientras dura el disparo, el evento del propio juego ve la posición, dirección, personaje y arma del J2. La munición es la del grupo y se usan los sprites, sonidos y proyectil del juego. Sin arma de fuego, Shift derecho es el sprint.
+- **Sprint:** el J2 copia la velocidad actual del J1 (así valen los cambios de velocidad del propio juego) más el bonus de sprint.
+- **Visión / luz:** el círculo de visión de la niebla (GALV_VisibilityRange) y TerraxLighting también se le dan al J2: unidos en cámara compartida, uno por vista en pantalla dividida.
+- **Combate:** funciona con el sistema de batalla de Termina. Las posiciones 1, 3 y 5 del grupo son del J1 y la 2 y 4 del J2.
+- **Teclas:** el J1 conserva `WASD` aunque el plugin de configuración de teclado del juego remapee teclas. El Shift derecho es exclusivo del J2.
 
-Desde JavaScript: `CoopLocalActions.onP2Action((player2, actor) => { ... })`.
+### Estado en Fear & Hunger 2
 
-## Notas para Fear & Hunger (léelas)
-
-- El plugin se escribió sin acceso a Fear & Hunger, así que el selector de personaje, los turnos de combate y la pantalla dividida **no están probados ahí**. Si algo falla, abre un issue.
-- Fear & Hunger 2 tiene sprint y permite disparar armas a distancia en el mapa antes del combate. **Esa lógica es de los plugins/eventos del propio juego**: el sprint del J2 funciona con Shift derecho y copia la velocidad del J1, pero que el J2 dispare requiere apuntar el evento de disparo del juego al J2. Usa el gancho de arriba, o abre un issue con los nombres del plugin/eventos comunes de disparo del juego para conectarlo.
-- El orden en combate usa la posición en el grupo, así que los aliados que reclutes se alternan entre J1 y J2.
+Probado en un entorno de navegador con los datos reales del juego: unión (menú y automática), cambios de grupo, cámara compartida y dividida con el círculo de visión, turnos de combate con bloqueo de teclas y un disparo de pistola del J2 (el proyectil sale del J2, se gasta munición y se ve la pose de disparo). **No** probado en una partida completa, con fusil/escopeta, con el requisito de armadura de la Botánica, ni con todos los enemigos reaccionando a las balas del J2; si algo falla, abre un issue. Fear & Hunger 1 no está soportado por este plugin.
 
 ## Límites conocidos
 

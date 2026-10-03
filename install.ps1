@@ -6,12 +6,12 @@
 param(
     [Parameter(Mandatory = $true)][string]$GamePath,
     [switch]$Uninstall,
-    # auto = detecta por el titulo del juego. lookoutside = solo el plugin base. fearhunger = base + acciones de P2 (disparo previo al combate).
+    # auto = detecta por el titulo del juego. lookoutside = solo el plugin base. fearhunger = base + plugin de Fear & Hunger (luz de P2, disparo previo al combate).
     [ValidateSet('auto', 'lookoutside', 'fearhunger', 'generic')][string]$Profile = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
-$allNames = @('LookOutsideOnline', 'LocalCoop_FearHunger_Actions', 'LookOutsideOnline_Actions')
+$allNames = @('LookOutsideOnline', 'LocalCoop_FearHunger', 'LocalCoop_FearHunger_Actions', 'LookOutsideOnline_Actions')
 
 $candidates = @("$GamePath\js", "$GamePath\www\js")
 $jsDir = $candidates | Where-Object { Test-Path "$_\plugins.js" } | Select-Object -First 1
@@ -33,7 +33,7 @@ if ($Profile -eq 'auto') {
     Write-Host "Juego detectado: '$title' -> perfil $Profile"
 }
 $names = @('LookOutsideOnline')
-if ($Profile -eq 'fearhunger') { $names += 'LocalCoop_FearHunger_Actions' }
+if ($Profile -eq 'fearhunger') { $names += 'LocalCoop_FearHunger' }
 $text = [IO.File]::ReadAllText($pluginsJs)
 
 if ($Uninstall) {

@@ -195,8 +195,27 @@
             : PIXI.RenderTexture.create(w, h);
     }
 
+    // Modo de mezcla "DST_IN" (resultado = destino x alfa del origen) para unir huecos de luz.
+    // Pixi 5 lo trae; en Pixi 4 (RPG Maker MV) se registra uno propio.
+    const CUSTOM_DST_IN = 40;
+    function dstInMode() {
+        const r = getRenderer();
+        if (!r || !r.gl) return null;
+        if (pixiIs5()) {
+            return (PIXI.BLEND_MODES && PIXI.BLEND_MODES.DST_IN !== undefined) ? PIXI.BLEND_MODES.DST_IN : null;
+        }
+        const table = PIXI.utils && PIXI.utils.premultiplyBlendMode;
+        if (!r.state || !r.state.blendModes || !table) return null;
+        if (!r.state.blendModes[CUSTOM_DST_IN]) {
+            r.state.blendModes[CUSTOM_DST_IN] = [r.gl.ZERO, r.gl.SRC_ALPHA];
+            table[0][CUSTOM_DST_IN] = CUSTOM_DST_IN;
+            table[1][CUSTOM_DST_IN] = CUSTOM_DST_IN;
+        }
+        return CUSTOM_DST_IN;
+    }
+
     function canUnionLights() {
-        return pixiIs5() && PIXI.BLEND_MODES && PIXI.BLEND_MODES.DST_IN !== undefined && !!getRenderer();
+        return dstInMode() !== null;
     }
 
     function canSplit() {
@@ -254,6 +273,8 @@
         const m = Object.assign({}, base);
         delete m[37]; delete m[38]; delete m[39]; delete m[40];
         delete m[96];
+        // P1 siempre tiene WASD (algunos juegos reescriben el mapa de teclas, p.ej. YEP_KeyboardConfig)
+        m[87] = 'up'; m[65] = 'left'; m[83] = 'down'; m[68] = 'right';
         if (owner === 1 || (inScene(Scene_Map) && !messageBusy())) delete m[13];
         return m;
     }
@@ -277,8 +298,14 @@
             !messageBusy() && !CoopState.selecting && !!$gameParty.leader();
     }
 
+    // El Shift derecho es de P2: P1 solo reacciona al izquierdo (en Termina Shift tambien dispara)
+    function isRightShift(e) {
+        return e.keyCode === 16 && (e.location === 2 || e.code === 'ShiftRight');
+    }
+
     const _Input_onKeyDown = Input._onKeyDown;
     Input._onKeyDown = function(event) {
+        if ($gamePlayer2 && isRightShift(event)) return;
         // X en el mapa antes de que P2 se una = unirse (no abre el menu)
         if (!$gamePlayer2 && event.keyCode === KEY_JOIN && isMapIdle()) {
             return;
@@ -288,6 +315,7 @@
 
     const _Input_onKeyUp = Input._onKeyUp;
     Input._onKeyUp = function(event) {
+        if ($gamePlayer2 && isRightShift(event)) return;
         _Input_onKeyUp.call(this, event);
         if ($gamePlayer2 || CoopState.selecting) {
             // soltar la tecla en todos los contextos para que nunca quede "pegada"
@@ -370,8 +398,8 @@
     // CARTELES (union de P2, camara, etc.)
     // =========================================================================
 
-    function drawBox(bitmap, w, h, color) {
-        bitmap.fillRect(0, 0, w, h, 'rgba(0,0,0,0.80)');
+    function drawBox(bitmap, w, h, color, alpha) {
+        bitmap.fillRect(0, 0, w, h, 'rgba(0,0,0,' + (alpha === undefined ? 0.80 : alpha) + ')');
         bitmap.fillRect(0, 0, 6, h, color);
         bitmap.fillRect(0, 0, w, 2, color);
         bitmap.fillRect(0, h - 2, w, 2, color);
@@ -428,7 +456,7 @@
         }
         if (this._life >= this._duration) {
             if (this.parent) this.parent.removeChild(this);
-            if (this.bitmap) this.bitmap.destroy();
+            if (this.bitmap && this.bitmap.destroy) this.bitmap.destroy();
             this.bitmap = null;
         }
     };
@@ -440,7 +468,7 @@
             // un solo cartel a la vez: reemplaza al anterior
             if (scene._coopBanner && scene._coopBanner.parent) {
                 scene._coopBanner.parent.removeChild(scene._coopBanner);
-                scene._coopBanner.destroy();
+                if (scene._coopBanner.destroy) scene._coopBanner.destroy();
             }
             scene._coopBanner = new Sprite_CoopBanner(title, sub, color || COLOR_P2, duration);
             scene.addChild(scene._coopBanner);
@@ -460,12 +488,12 @@
 
     Sprite_CoopTurn.prototype.initialize = function() {
         Sprite.prototype.initialize.call(this);
-        this._w = 460;
-        this._h = 72;
+        this._w = 250;
+        this._h = 30;
         this.bitmap = new Bitmap(this._w, this._h);
         this.anchor.x = 0.5;
         this.x = Graphics.width / 2;
-        this.y = 10;
+        this.y = 4;
         this._key = '';
         this._pulse = 0;
         this.opacity = 0;
@@ -482,19 +510,13 @@
         const bmp = this.bitmap;
         bmp.clear();
         const color = info.owner === 1 ? COLOR_P1 : COLOR_P2;
-        drawBox(bmp, this._w, this._h, color);
+        drawBox(bmp, this._w, this._h, color, 0.45);
         bmp.fontFace = mainFont();
-        bmp.outlineColor = 'rgba(0,0,0,0.9)';
-        bmp.outlineWidth = 4;
+        bmp.outlineColor = 'rgba(0,0,0,0.8)';
+        bmp.outlineWidth = 3;
         bmp.textColor = '#ffffff';
-        bmp.fontSize = 28;
-        bmp.drawText('PLAYER ' + info.owner + "'S TURN  -  " + info.name, 14, 4, this._w - 24, 36, 'center');
         bmp.fontSize = 18;
-        bmp.textColor = '#cfcfcf';
-        const hint = info.owner === 1
-            ? 'Move: W A S D    OK: Z / Space    Back: X / Esc'
-            : 'Move: Arrow keys    OK: Enter    Back: Backspace';
-        bmp.drawText(hint, 14, 42, this._w - 24, 26, 'center');
+        bmp.drawText('P' + info.owner + ' TURN - ' + info.name, 10, 0, this._w - 16, this._h, 'center');
     };
 
     Sprite_CoopTurn.prototype.update = function() {
@@ -512,10 +534,7 @@
             this.redraw(info);
         }
         this._pulse++;
-        this.opacity = Math.min(255, this.opacity + 40);
-        const s = 1 + Math.max(0, 12 - this._pulse) * 0.01;
-        this.scale.x = s;
-        this.scale.y = s;
+        this.opacity = Math.min(215, this.opacity + 40);
     };
 
     const _Scene_Battle_createAllWindows = Scene_Battle.prototype.createAllWindows;
@@ -711,11 +730,16 @@
     }
 
     // Lista para el selector. Usa los datos de la base sin crear actores nuevos en la partida.
+    // Fear & Hunger 2: Termina - los 7 personajes con "SELECT" propio en el juego
+    const TERMINA_PLAYABLE = [1, 3, 4, 5, 13, 14, 15];
+
     function selectableActors() {
         const leader = $gameParty.leader();
         const leaderId = leader ? leader.actorId() : 0;
-        const ids = P2_ACTOR_CHOICES.length > 0
-            ? P2_ACTOR_CHOICES
+        const choices = (P2_ACTOR_CHOICES.length === 0 && /termina/i.test(gameTitle()))
+            ? TERMINA_PLAYABLE : P2_ACTOR_CHOICES;
+        const ids = choices.length > 0
+            ? choices
             : $dataActors.map((a, i) => (a && a.name && a.characterName) ? i : 0).filter(i => i > 0);
         return ids
             .filter(id => id !== leaderId && $dataActors[id])
@@ -888,7 +912,8 @@
     };
 
     Game_Player2.prototype.isDashing = function() {
-        return keysP2.shift;
+        if (!keysP2.shift) return false;
+        return coopHooks.every(h => !h.canP2Dash || h.canP2Dash());
     };
 
     Game_Player2.prototype.realMoveSpeed = function() {
@@ -907,7 +932,16 @@
         return !$gameMap.isEventRunning() && !messageBusy() && !CoopState.selecting;
     };
 
+    Game_Player2.prototype.syncActorImage = function() {
+        const actor = CoopView.p2Actor();
+        if (!actor) return;
+        if (this._characterName !== actor.characterName() || this._characterIndex !== actor.characterIndex()) {
+            this.setImage(actor.characterName(), actor.characterIndex());
+        }
+    };
+
     Game_Player2.prototype.update = function() {
+        this.syncActorImage();
         Game_Character.prototype.update.call(this);
 
         if (!this.isMoving() && this.canMoveP2()) {
@@ -1120,7 +1154,20 @@
     // VISTA: LUZ DE P2 + PANTALLA DIVIDIDA
     // =========================================================================
 
+    const coopHooks = [];
+
     const CoopView = {
+        // Para plugins de juego concreto (ver LocalCoop_FearHunger.js). Un gancho puede definir:
+        //   splitPass(spriteset, indice, jugador) / splitPassEnd(spriteset, indice)
+        //   canP2Dash() -> false para impedir el sprint de P2 (p.ej. con un arma equipada)
+        registerHook(h) { coopHooks.push(h); },
+        hooks: coopHooks,
+        player2() { return $gamePlayer2; },
+        p2ActorId() { return $gameSystem ? $gameSystem._coopP2ActorId || 0 : 0; },
+        p2Actor() {
+            const id = this.p2ActorId();
+            return id ? $gameActors.actor(id) : null;
+        },
         cycleCamera() {
             cameraMode = (cameraMode + 1) % 4;
             if (cameraMode === CAM_SPLIT && !canSplit()) cameraMode = CAM_P1;
@@ -1136,15 +1183,25 @@
     };
     window.CoopLocal = CoopView;
 
-    // Imagenes de luz del jugador (por nombre). No se filtra por posicion: el juego a veces
-    // las deja desfasadas unos cuadros, y entonces dejarian de reconocerse y taparian todo.
-    Spriteset_Map.prototype.coopLightSprites = function() {
-        if (!this._pictureContainer || LIGHT_NAMES.length === 0) return [];
-        return this._pictureContainer.children.filter(s => {
-            if (!s.picture) return false;
-            const pic = s.picture();
-            return !!pic && LIGHT_NAMES.indexOf(pic.name()) >= 0;
+    // Fuentes de luz del jugador: { sprite, pos(jugador) -> [x, y] en pantalla }.
+    //  - Imagenes por nombre (Look Outside: "Darkness"). No se filtra por posicion: el juego a veces
+    //    las deja desfasadas unos cuadros, y entonces dejarian de reconocerse y taparian todo.
+    //  - Las que aporten los ganchos (h.lightSources(spriteset)), p.ej. el circulo de vision de Termina.
+    Spriteset_Map.prototype.coopLightSources = function() {
+        const list = [];
+        if (this._pictureContainer && LIGHT_NAMES.length > 0) {
+            for (const s of this._pictureContainer.children) {
+                if (!s.picture) continue;
+                const pic = s.picture();
+                if (pic && LIGHT_NAMES.indexOf(pic.name()) >= 0) {
+                    list.push({ sprite: s, pos: p => [p.screenX(), p.screenY()] });
+                }
+            }
+        }
+        coopHooks.forEach(h => {
+            if (h.lightSources) h.lightSources(this).forEach(d => list.push(d));
         });
+        return list;
     };
 
     // Sincroniza posiciones de sprites con la camara actual
@@ -1180,12 +1237,15 @@
     // ---- LUZ COMPARTIDA: une el hueco de luz de P1 y P2 -----------------------
 
     Spriteset_Map.prototype.coopSharedLights = function() {
-        const lights = this.coopLightSprites();
+        const sources = this.coopLightSources();
         const r = getRenderer();
         const W = Graphics.width;
         const H = Graphics.height;
+        this._coopLit = this._coopLit || [];
 
-        for (const l of lights) {
+        for (const d of sources) {
+            const l = d.sprite;
+            if (this._coopLit.indexOf(l) < 0) this._coopLit.push(l);
             if (!canUnionLights() || !l.visible || !l.texture || !l.texture.valid) {
                 l.renderable = true;
                 if (l._coopLight) l._coopLight.out.visible = false;
@@ -1200,7 +1260,7 @@
                     out: null
                 };
                 st.out = new PIXI.Sprite(st.rt);
-                st.b.blendMode = PIXI.BLEND_MODES.DST_IN;
+                st.b.blendMode = dstInMode();
                 if (l.parent) l.parent.addChildAt(st.out, l.parent.children.indexOf(l));
             }
             if (st.rt.width !== W || st.rt.height !== H) st.rt.resize(W, H);
@@ -1211,8 +1271,8 @@
                 s.anchor.set(l.anchor.x, l.anchor.y);
                 s.scale.set(l.scale.x, l.scale.y);
             }
-            st.a.position.set($gamePlayer.screenX(), $gamePlayer.screenY());
-            st.b.position.set($gamePlayer2.screenX(), $gamePlayer2.screenY());
+            st.a.position.set.apply(st.a.position, d.pos($gamePlayer));
+            st.b.position.set.apply(st.b.position, d.pos($gamePlayer2));
 
             r.render(st.a, st.rt, true);
             r.render(st.b, st.rt, false);
@@ -1220,13 +1280,13 @@
             st.out.visible = true;
             st.out.alpha = l.alpha;
             st.out.blendMode = l.blendMode;
+            st.out.z = l.z; // dentro del tilemap se ordena por z
             l.renderable = false;
         }
     };
 
     Spriteset_Map.prototype.coopLightsOff = function() {
-        if (!this._pictureContainer) return;
-        for (const s of this._pictureContainer.children) {
+        for (const s of (this._coopLit || [])) {
             if (s._coopLight) {
                 s.renderable = true;
                 s._coopLight.out.visible = false;
@@ -1275,26 +1335,31 @@
         st.divider.endFill();
 
         // detectar las luces con la camara principal (centrada en P1) antes de moverla
-        const lights = this.coopLightSprites();
+        const sources = this.coopLightSources();
+        const lights = sources.map(d => d.sprite);
 
         const saved = [$gameMap._displayX, $gameMap._displayY, $gameMap._parallaxX, $gameMap._parallaxY];
         const players = [$gamePlayer, $gamePlayer2];
 
-        this._baseSprite.visible = true;
         this.renderable = true;
+        this.children.forEach(c => { c.visible = true; });
 
         for (let i = 0; i < 2; i++) {
             applyCamera(cameraFor(players[i], vpW, vpH));
             this.coopSyncToCamera();
+            coopHooks.forEach(h => h.splitPass && h.splitPass(this, i, players[i]));
             for (const pic of this._pictureContainer.children) {
                 pic.renderable = lights.indexOf(pic) >= 0;
             }
-            for (const l of lights) {
+            for (const d of sources) {
+                const l = d.sprite;
                 if (l._coopLight && l._coopLight.out) l._coopLight.out.visible = false;
-                l.x = players[i].screenX();
-                l.y = players[i].screenY();
+                const pos = d.pos(players[i]);
+                l.x = pos[0];
+                l.y = pos[1];
             }
             r.render(this, st.rts[i], true);
+            coopHooks.forEach(h => h.splitPassEnd && h.splitPassEnd(this, i));
         }
 
         $gameMap._displayX = saved[0];
@@ -1303,8 +1368,11 @@
         $gameMap._parallaxY = saved[3];
         this.coopSyncToCamera();
 
-        // el render final del escenario solo dibuja las imagenes (a pantalla completa)
-        this._baseSprite.visible = false;
+        // el render final del escenario solo dibuja las imagenes (a pantalla completa);
+        // el mapa, las luces, el clima, etc. ya estan dentro de cada vista
+        this.children.forEach(c => {
+            if (c !== this._pictureContainer && c !== this._timerSprite) c.visible = false;
+        });
         for (const pic of this._pictureContainer.children) {
             pic.renderable = lights.indexOf(pic) < 0;
         }
@@ -1316,7 +1384,7 @@
         st.active = false;
         for (const s of st.sprites) if (s.parent) s.parent.removeChild(s);
         if (st.divider.parent) st.divider.parent.removeChild(st.divider);
-        this._baseSprite.visible = true;
+        this.children.forEach(c => { c.visible = true; });
         for (const pic of this._pictureContainer.children) pic.renderable = true;
         this.coopSyncToCamera();
     };
@@ -1347,7 +1415,7 @@
             this._coopSplit.rts.forEach(rt => rt.destroy(true));
             this._coopSplit = null;
         }
-        for (const s of (this._pictureContainer ? this._pictureContainer.children : [])) {
+        for (const s of (this._coopLit || [])) {
             if (s._coopLight && s._coopLight.rt) {
                 s._coopLight.rt.destroy(true);
                 s._coopLight = null;
@@ -1387,8 +1455,42 @@
         }
 
         if ($gamePlayer2 && !CoopState.selecting) {
-            $gamePlayer2.update();
+            if (coopMode() === 'select') this.coopFollowSecondMember();
+            if ($gamePlayer2) $gamePlayer2.update();
         }
+    };
+
+    // Los protagonistas pueden abandonar el grupo: P2 siempre es el miembro en la 2.a posicion.
+    // Si el grupo se queda solo con el protagonista, P2 sale hasta que vuelva a unirse con X.
+    Scene_Map.prototype.coopFollowSecondMember = function() {
+        if ($gameMap.isEventRunning() && !$gameParty.members()[1]) return; // eventos que reordenan el grupo
+        const second = $gameParty.members()[1];
+        if (!second) {
+            this.coopRemovePlayer2();
+            CoopUI.banner('Player 2 left the party', 'Press X to rejoin', COLOR_P2, 160);
+            return;
+        }
+        if ($gameSystem._coopP2ActorId !== second.actorId()) {
+            $gameSystem._coopP2ActorId = second.actorId();
+            CoopUI.banner('Player 2 is now ' + second.name(), '', COLOR_P2, 110);
+        }
+    };
+
+    Scene_Map.prototype.coopRemovePlayer2 = function() {
+        const p2 = $gamePlayer2;
+        $gamePlayer2 = null;
+        $gameSystem._coopP2ActorId = 0;
+        if (this._spriteset) {
+            const list = this._spriteset._characterSprites;
+            for (let i = list.length - 1; i >= 0; i--) {
+                if (list[i]._character === p2) {
+                    if (list[i].parent) list[i].parent.removeChild(list[i]);
+                    list.splice(i, 1);
+                }
+            }
+        }
+        CoopState.lastOwner = 0;
+        Input.clear();
     };
 
     Scene_Map.prototype.coopBeginJoin = function() {
@@ -1397,10 +1499,11 @@
             return;
         }
 
-        // si ya habia elegido personaje antes (partida guardada) lo reutiliza
-        const saved = $gameSystem._coopP2ActorId;
-        if (saved && $gameParty._actors.includes(saved)) {
-            this.spawnPlayer2(saved);
+        // Con 2 o mas personajes en el grupo, P2 pasa a ser automaticamente el 2.o.
+        // Con solo el protagonista, se le pregunta a que personaje quiere sumar al grupo.
+        const second = $gameParty.members()[1];
+        if (second) {
+            this.spawnPlayer2(second.actorId());
             return;
         }
         this.coopOpenSelect();

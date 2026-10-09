@@ -110,6 +110,10 @@
 
 (() => {
 
+    // Si alguien carga este archivo a mano antes de que arranque el juego, no hacer nada
+    // (el plugin se carga solo desde plugins.js).
+    if (typeof PluginManager === 'undefined' || typeof Input === 'undefined') return;
+
     const PLUGIN_NAME = 'LookOutsideOnline';
     const params = PluginManager.parameters(PLUGIN_NAME) || {};
     const IS_MZ = (typeof Utils !== 'undefined') && Utils.RPGMAKER_NAME === 'MZ';
